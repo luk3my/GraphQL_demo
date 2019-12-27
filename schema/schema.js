@@ -1,25 +1,47 @@
 const graphql = require('graphql');
-const _ = require('lodash');
+const axios = require('axios');
 const {
     GraphQLObjectType,
     GraphQLString,
     GraphQLInt,
-    GraphQLSchema
+    GraphQLSchema,
+    GraphQLList
 } = graphql;
 
-const users = [
-    { id: '23', firstName: 'Bill', age: 20 },
-    { id: '47', firstName: 'Samantha', age: 21 }
-];
-
 //Tell GraphQL what fields and types of data to expect
+
+const CompanyType = new GraphQLObjectType({
+    name: "company",
+    // This will allow the UserType variable to be defined even though it is declared after the function runs
+    fields: () => ({
+        id: { type: GraphQLString },
+        name: { type: GraphQLString },
+        description: { type: GraphQLString },
+        users: {
+            type: new GraphQLList(UserType),
+            resolve(parentValue, args) {
+                return axios.get(`http://localhost:3000/companies/${parentValue.id}/users`)
+                    .then(res => res.data)
+            }
+        }
+    })
+});
+
 const UserType = new GraphQLObjectType({
     name: 'User',
-    fields: {
-       id: { type: GraphQLString },
-       firstName: { type: GraphQLString },
-       age: { type: GraphQLInt }
-    }
+    fields: () => ({
+        id: { type: GraphQLString },
+        firstName: { type: GraphQLString },
+        age: { type: GraphQLInt },
+        company: {
+            type: CompanyType,
+            resolve(parentValue, args) {
+                //console log parentValue to see the object of the user with the id used in the query.  companyId is availbe in the object
+                return axios.get(`http://localhost:3000/companies/${parentValue.companyId}`)
+                    .then(res => res.data)
+            }
+        }
+    })
 });
 
 const RootQuery = new GraphQLObjectType({
@@ -29,9 +51,22 @@ const RootQuery = new GraphQLObjectType({
             type: UserType,
             args: { id: { type: GraphQLString } },
             resolve(parentValue, args) {
-                return _.find(users, { id: args.id });
+               //request to JSON server
+                return axios.get(`http://localhost:3000/users/${args.id}`)
+                    //axios nests data under a key called data
+                    .then(resp => resp.data)
             }
-        }        
+        },
+        company: {
+            type: CompanyType,
+            args: { id: { type: GraphQLString } },
+            resolve(parentValue, args) {
+               //request to JSON server
+                return axios.get(`http://localhost:3000/companies/${args.id}`)
+                    //axios nests data under a key called data
+                    .then(resp => resp.data)
+            }
+        }         
     }
 });
 
